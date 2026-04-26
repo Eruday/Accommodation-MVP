@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Register - GermanyRooms</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+
+<nav>
+  <a class="brand" href="index.html">GermanyRooms</a>
+  <div><a href="login.html">Login</a></div>
+</nav>
+
+<div class="form-card">
+  <h2>Create Account</h2>
+  <input type="text"  id="name"     placeholder="Full Name" />
+  <input type="email" id="email"    placeholder="Email" />
+  <input type="text"  id="phone"    placeholder="Phone Number" />
+  <input type="password" id="password" placeholder="Password" />
+  <button onclick="register()">Register</button>
+  <p class="msg" id="msg"></p>
+  <p class="link">Already have an account? <a href="login.html">Login</a></p>
+</div>
+
+<script>
+  async function register() {
+    const body = {
+      name:     document.getElementById('name').value,
+      email:    document.getElementById('email').value,
+      phone:    document.getElementById('phone').value,
+      password: document.getElementById('password').value
+    };
+    const res  = await fetch('http://localhost:5000/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    const msg  = document.getElementById('msg');
+    if (res.ok) {
+      msg.textContent = 'Registered! Redirecting to login...';
+      msg.className = 'msg success';
+      setTimeout(() => location.href = 'login.html', 1500);
+    } else {
+      msg.textContent = data.message;
+      msg.className = 'msg';
+    }
+  }
+</script>
+</body>
+</html>

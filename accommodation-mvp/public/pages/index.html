@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Germany Rooms - Find Accommodation</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<nav>
+  <span class="brand">GermanyRooms</span>
+  <div id="nav-links">
+    <a href="login.html">Login</a>
+    <a href="register.html">Register</a>
+  </div>
+</nav>
+
+<div class="container">
+  <h1>Find a Room in Germany</h1>
+
+  <div class="search-bar">
+    <input type="text" id="search-input" placeholder="Search by city (e.g. Munich, Berlin)" />
+    <button onclick="searchRooms()">Search</button>
+    <button onclick="loadRooms()">All</button>
+  </div>
+
+  <div class="rooms-grid" id="rooms-grid">
+    <p>Loading rooms...</p>
+  </div>
+</div>
+
+<script>
+  const API = 'http://localhost:5000/api';
+
+  function updateNav() {
+    const name = localStorage.getItem('userName');
+    const nav = document.getElementById('nav-links');
+    if (name) {
+      nav.innerHTML = `
+        <span style="color:#f39c12">Hi, ${name}</span>
+        <a href="post-room.html">Post Room</a>
+        <a href="#" onclick="logout()">Logout</a>`;
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userName');
+    location.reload();
+  }
+
+  async function loadRooms(location = '') {
+    const url = location ? `${API}/rooms?location=${location}` : `${API}/rooms`;
+    const res = await fetch(url);
+    const rooms = await res.json();
+    renderRooms(rooms);
+  }
+
+  function searchRooms() {
+    const val = document.getElementById('search-input').value.trim();
+    loadRooms(val);
+  }
+
+  function renderRooms(rooms) {
+    const grid = document.getElementById('rooms-grid');
+    if (!rooms.length) { grid.innerHTML = '<p>No rooms found.</p>'; return; }
+    grid.innerHTML = rooms.map(r => `
+      <div class="room-card" onclick="location.href='room.html?id=${r._id}'">
+        <img src="${r.image ? 'http://localhost:5000/uploads/' + r.image : 'https://placehold.co/400x200?text=No+Image'}" alt="room"/>
+        <div class="info">
+          <h3>${r.title}</h3>
+          <div class="price">€${r.price}/month</div>
+          <div class="location">${r.location}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  updateNav();
+  loadRooms();
+</script>
+</body>
+</html>

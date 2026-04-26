@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Post a Room - GermanyRooms</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+
+<nav>
+  <a class="brand" href="index.html">GermanyRooms</a>
+  <div>
+    <a href="index.html">Browse</a>
+    <a href="#" onclick="logout()">Logout</a>
+  </div>
+</nav>
+
+<div class="form-card">
+  <h2>Post a Room</h2>
+  <form id="room-form" enctype="multipart/form-data">
+    <input type="text"   name="title"        placeholder="Room Title (e.g. Cozy room in Munich)" required />
+    <input type="number" name="price"        placeholder="Monthly Rent (€)" required />
+    <input type="text"   name="location"     placeholder="City (e.g. Berlin, Hamburg)" required />
+    <input type="email"  name="contactEmail" placeholder="Contact Email" required />
+    <input type="text"   name="contactPhone" placeholder="Contact Phone" required />
+
+    <!-- ── NEW FIELDS ─────────────────────────────────────── -->
+    <input type="number" name="securityDeposit" placeholder="Security Deposit (€) — leave 0 if none" min="0" />
+
+    <select name="roomType" required>
+      <option value="" disabled selected>Room Type</option>
+      <option value="single">Single Room</option>
+      <option value="shared">Shared Room</option>
+      <option value="studio">Studio</option>
+      <option value="apartment">Apartment</option>
+    </select>
+
+    <select name="furnishing" required>
+      <option value="" disabled selected>Furnishing</option>
+      <option value="furnished">Fully Furnished</option>
+      <option value="semi">Semi Furnished</option>
+      <option value="unfurnished">Unfurnished</option>
+    </select>
+
+    <label style="font-size:0.85rem;color:#555;margin-bottom:0.25rem;display:block">Available From *</label>
+    <input type="date" name="availableFrom" required />
+
+    <input type="number" name="minStay" placeholder="Minimum Stay (months) — optional" min="1" />
+
+    <textarea name="additionalNotes" rows="3" placeholder="Additional Notes (pets allowed, no smoking, etc.)"></textarea>
+    <!-- ──────────────────────────────────────────────────── -->
+
+    <input type="file"   name="image" accept="image/*"  required />
+    <button type="submit">Post Room</button>
+  </form>
+  <p class="msg" id="msg"></p>
+</div>
+
+<script>
+  const token = localStorage.getItem('token');
+  if (!token) location.href = 'login.html';
+
+  function logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userName');
+    location.href = 'index.html';
+  }
+
+  document.getElementById('room-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const res = await fetch('http://localhost:5000/api/rooms', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData
+    });
+    const data = await res.json();
+    const msg  = document.getElementById('msg');
+    if (res.ok) {
+      msg.textContent = 'Room posted! Redirecting...';
+      msg.className = 'msg success';
+      setTimeout(() => location.href = 'index.html', 1500);
+    } else {
+      msg.textContent = data.message;
+      msg.className = 'msg';
+    }
+  });
+</script>
+</body>
+</html>
