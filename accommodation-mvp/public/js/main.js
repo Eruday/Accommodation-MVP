@@ -1,5 +1,5 @@
 // Shared utilities used across pages
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'https://accommodation-mvp.onrender.com/api';
 
 function getToken() {
   return localStorage.getItem('token');
