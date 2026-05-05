@@ -143,7 +143,7 @@
 </div>
 
 <script>
-  const API = 'http://localhost:5000/api';
+  const API = 'https://accommodation-mvp.onrender.com/api';
 
   function toggleMenu() {
     document.getElementById('nav-links').classList.toggle('active');
@@ -220,7 +220,7 @@
 
     grid.innerHTML = rooms.map(r => {
       const img = r.images && r.images.length > 0
-        ? `http://localhost:5000/uploads/${r.images[0]}`
+        ? `https://accommodation-mvp.onrender.com/uploads/${r.images[0]}`
         : 'https://placehold.co/400x200?text=No+Image';
       const isOccupied = r.status === 'occupied';
       return `
