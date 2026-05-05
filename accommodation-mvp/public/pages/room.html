@@ -9,8 +9,10 @@
 <body>
 
 <nav>
-  <a class="brand" href="index.html">GermanyRooms</a>
-  <div><a href="index.html">Back to Listings</a></div>
+<a href="../pages/index.html" class="logo">
+    <div class="logo-icon">IX</div>
+    <div class="logo-text">ISHAANX</div>
+  </a>  <div><a href="index.html">View All Rooms</a></div>
 </nav>
 
 <div class="container">
@@ -19,13 +21,42 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
 <script>
   const id = new URLSearchParams(location.search).get('id');
+  let currentImageIndex = 0;
+  let roomImages = [];
+  
+  // Zoom and swipe variables
+  let currentZoom = 1;
+  let isZoomed = false;
+  let imageTranslateX = 0;
+  let imageTranslateY = 0;
+  let isDragging = false;
+  let startX = 0;
+  let startY = 0;
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let isSwipeGesture = false;
+  let lightboxEventsSetup = false; // Flag to prevent multiple setups
 
   async function loadRoom() {
-    const res  = await fetch(`http://localhost:5000/api/rooms/${id}`);
-    const room = await res.json();
-    if (!res.ok) { document.getElementById('room-detail').innerHTML = '<p>Room not found.</p>'; return; }
+    try {
+      if (!id) {
+        document.getElementById('room-detail').innerHTML = '<p>Invalid room ID.</p>';
+        return;
+      }
+
+      const res = await fetch(`http://localhost:5000/api/rooms/${id}`);
+      if (!res.ok) {
+        document.getElementById('room-detail').innerHTML = '<p>Room not found.</p>';
+        return;
+      }
+
+      const room = await res.json();
+
+    // Store images for lightbox
+    roomImages = room.images || [];
 
     // ── ADDED: helpers for new fields ───────────────────────────
     const roomTypeLabel   = { single: 'Single Room', shared: 'Shared Room', studio: 'Studio', apartment: 'Apartment' };
@@ -34,13 +65,96 @@
     // ────────────────────────────────────────────────────────────
 
     document.getElementById('room-detail').innerHTML = `
-      <img src="${room.image ? 'http://localhost:5000/uploads/' + room.image : 'https://placehold.co/800x360?text=No+Image'}" alt="room"/>
+      <!-- Gallery Grid -->
+      <div class="gallery-grid">
+        ${room.images && room.images.length > 0 ? room.images.map((img, idx) => `
+          <div class="gallery-item" onclick="openLightbox(${idx})">
+            <img src="http://localhost:5000/uploads/${img}" alt="room ${idx + 1}">
+            <div class="overlay">View</div>
+          </div>
+        `).join('') : `
+          <div class="gallery-item">
+            <img src="https://placehold.co/400x300?text=No+Image" alt="room">
+          </div>
+        `}
+      </div>
+
+      <!-- Lightbox Modal -->
+      <div class="lightbox" id="lightbox">
+        <div class="lightbox-container">
+          <span class="close-btn" onclick="closeLightbox()">&times;</span>
+          <button class="lightbox-btn prev" onclick="prevImage()">&#10094;</button>
+          <div class="image-container">
+            <img class="lightbox-image" id="lightbox-image" src="" alt="Full view">
+          </div>
+          <button class="lightbox-btn next" onclick="nextImage()">&#10095;</button>
+          <div class="lightbox-counter"><span id="current-img">1</span> / <span id="total-imgs">1</span></div>
+          
+          <!-- Zoom Controls -->
+          <div class="zoom-controls">
+            <button class="zoom-btn" onclick="zoomIn()">+</button>
+            <button class="zoom-btn" onclick="zoomOut()">−</button>
+            <button class="zoom-btn" onclick="resetZoom()">⟲</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat Modal -->
+      <div class="chat-overlay" id="chat-overlay" style="display: none;">
+        <div class="chat-modal">
+          <div class="chat-header">
+            <h3 id="chat-title">Chat with Owner</h3>
+            <p id="chat-room-title" class="room-title">Room Title</p>
+            <button class="close-chat" onclick="closeChat()">&times;</button>
+          </div>
+          <div class="messages-container" id="messages-container">
+            <div class="no-messages">
+              <p>Loading messages...</p>
+            </div>
+          </div>
+          <div class="message-input-container">
+            <textarea
+              id="message-input"
+              class="message-input"
+              placeholder="Type your message..."
+              rows="1"
+              autocomplete="off"
+              spellcheck="true"
+            ></textarea>
+            <button id="send-button" class="send-button" onclick="sendMessage()">Send</button>
+          </div>
+        </div>
+      </div>
+
       <h2>${room.title}</h2>
       <div class="price">€${room.price} / month</div>
-      <p style="margin-top:0.5rem;color:#555">📍 ${room.location}</p>
+      <button id="favorite-btn" class="favorite-btn-detail" onclick="toggleFavorite('${room._id}', this)">
+        <span class="heart-icon">♥</span> Save to Favorites
+      </button>
+      <button id="message-btn" class="message-btn-detail" onclick="openChat('${room._id}', '${room.title.replace(/'/g, "\\'")}', '${room.postedBy?.name || 'Owner'}')">
+        <span class="message-icon">💬</span> Message Owner
+      </button>
+      <!-- ── ADDED: Edit and Delete buttons (only visible to room owner) ── -->
+      <div id="owner-actions" style="display:none;margin-top:1rem;gap:0.5rem;flex-wrap:wrap;">
+        <button class="btn-edit" onclick="editRoom('${room._id}')">✏️ Edit Room</button>
+        <button class="btn-delete" onclick="deleteRoom('${room._id}')">🗑️ Delete Room</button>
+        <button class="btn-toggle-status ${room.status === 'occupied' ? 'status-mark-available' : 'status-mark-occupied'}" id="toggle-status-btn" onclick="toggleRoomStatus('${room._id}')">
+          ${room.status === 'occupied' ? '✅ Mark as Available' : '🔴 Mark as Occupied'}
+        </button>
+      </div>      <p style="margin-top:0.5rem;color:#555">📍 ${room.location}</p>
       <p style="margin-top:0.5rem;color:#888;font-size:0.85rem">Posted by: ${room.postedBy?.name || 'Unknown'}</p>
 
-      <!-- ── NEW: Room Details section ──────────────────────── -->
+      <!-- ── Deposit Highlight ───────────────────────────── -->
+      <div class="deposit-banner">
+        <div>
+          <span class="deposit-title">Security Deposit</span>
+          <span class="deposit-amount">€${room.securityDeposit || 0}</span>
+        </div>
+        <p class="deposit-note">Refundable deposit required to hold this room.</p>
+      </div>
+
+      <!-- ── Room Details section ──────────────────────── -->
+      <h3 style="margin-top:2rem;margin-bottom:1rem;border-bottom:2px solid #f39c12;padding-bottom:0.5rem;">Pricing & Details</h3>
       <div class="details-grid">
         <div class="detail-item">
           <span class="detail-label">Room Type</span>
@@ -51,24 +165,744 @@
           <span class="detail-value">${furnishingLabel[room.furnishing] || room.furnishing}</span>
         </div>
         <div class="detail-item">
-          <span class="detail-label">Security Deposit</span>
-          <span class="detail-value">€${room.securityDeposit || 0}</span>
-        </div>
-        <div class="detail-item">
           <span class="detail-label">Available From</span>
           <span class="detail-value">${availableDate}</span>
         </div>
         ${room.minStay ? `<div class="detail-item"><span class="detail-label">Min. Stay</span><span class="detail-value">${room.minStay} month${room.minStay > 1 ? 's' : ''}</span></div>` : ''}
+        ${room.anmeldung !== undefined && room.anmeldung !== null ? `<div class="detail-item"><span class="detail-label">Anmeldung</span><span class="detail-value">${room.anmeldung ? '✅ Yes' : '❌ No'}</span></div>` : ''}
+        <div class="detail-item"><span class="detail-label">Status</span><span class="status-badge status-${room.status || 'available'}">${room.status === 'occupied' ? 'Occupied' : 'Available'}</span></div>
       </div>
+
+      <!-- ── AMENITIES SECTION ──────────────────────────── -->
+      ${room.amenities && room.amenities.length > 0 ? `
+        <h3 style="margin-top:2rem;margin-bottom:1rem;border-bottom:2px solid #f39c12;padding-bottom:0.5rem;">Amenities</h3>
+        <div class="amenities-grid">
+          ${room.amenities.map(amenity => {
+            const icons = {
+              'WiFi': '📶',
+              'Kitchen': '🍳',
+              'Parking': '🅿️',
+              'Washer': '🧺',
+              'Heating': '🔥',
+              'AC': '❄️'
+            };
+            return `<div class="amenity-badge"><span class="amenity-icon">${icons[amenity] || '✓'}</span>${amenity}</div>`;
+          }).join('')}
+        </div>
+      ` : ''}
+
+      <!-- ── ADDRESS SECTION ────────────────────────────── -->
+      ${room.address ? `
+        <h3 style="margin-top:2rem;margin-bottom:0.5rem;border-bottom:2px solid #f39c12;padding-bottom:0.5rem;">Location</h3>
+        <p style="color:#555;font-size:0.95rem;margin-bottom:1rem;">📍 <strong>Address:</strong> ${room.address}</p>
+      ` : ''}
+
       ${room.additionalNotes ? `<div class="notes-box"><strong>Notes:</strong> ${room.additionalNotes}</div>` : ''}
       <!-- ──────────────────────────────────────────────────── -->
 
-      <div class="contact-box">
+      <div class="contact-section">
         <h3>Contact Owner</h3>
-        <p>📧 Email: <a href="mailto:${room.contact.email}">${room.contact.email}</a></p>
-        <p>📞 Phone: <a href="tel:${room.contact.phone}">${room.contact.phone}</a></p>
+
+        <!-- Contact Buttons -->
+        <div class="contact-buttons">
+          <a href="tel:${room.contact.phone}" class="contact-btn call-btn">
+            📞 Call ${room.contact.phone}
+          </a>
+          <a href="https://wa.me/${room.contact.phone.replace(/[^0-9]/g, '')}?text=Hi, I am interested in your room listing at ${encodeURIComponent(window.location.href)}" class="contact-btn whatsapp-btn" target="_blank">
+            💬 WhatsApp
+          </a>
+          <a href="mailto:${room.contact.email}?subject=Inquiry about your room listing&body=Hi, I am interested in your room listing." class="contact-btn email-btn">
+            📧 Email
+          </a>
+        </div>
+
+        <!-- Contact Form -->
+        <div class="contact-form">
+          <h4>Send a Message</h4>
+          <form id="contact-form">
+            <input type="hidden" name="roomId" value="${room._id}">
+            <div class="form-group">
+              <label for="senderName">Your Name *</label>
+              <input type="text" id="senderName" name="senderName" required>
+            </div>
+            <div class="form-group">
+              <label for="senderEmail">Your Email *</label>
+              <input type="email" id="senderEmail" name="senderEmail" required>
+            </div>
+            <div class="form-group">
+              <label for="message">Message *</label>
+              <textarea id="message" name="message" rows="4" required placeholder="Hi, I am interested in this room..."></textarea>
+            </div>
+            <button type="submit" class="send-btn">Send Message</button>
+          </form>
+          <div id="form-message" class="form-message"></div>
+        </div>
       </div>`;
+
+    // Update lightbox counter
+    if (roomImages.length > 0) {
+      document.getElementById('total-imgs').textContent = roomImages.length;
+    }
+
+    // Setup lightbox event listeners after DOM is updated
+    setupLightboxEvents();
+
+    // Check favorite status
+    checkFavoriteStatus(room._id);
+
+    // Setup contact form after DOM is updated
+    setupContactForm();
+
+    // Check if current user is room owner
+    const currentUserId = await getCurrentUserId();
+    const isOwner = currentUserId && room.postedBy && room.postedBy._id === currentUserId;
+    if (isOwner) {
+      document.getElementById('owner-actions').style.display = 'flex'; // show Edit + Delete
+      document.getElementById('message-btn').style.display = 'none';   // hide Contact Owner
+    }
+
+    } catch (error) {
+      console.error('Error loading room:', error);
+      document.getElementById('room-detail').innerHTML = '<p>Error loading room. Please try again.</p>';
+    }
   }
+
+  // Lightbox Functions
+  function openLightbox(index) {
+    currentImageIndex = index;
+    const lightbox = document.getElementById('lightbox');
+    const img = document.getElementById('lightbox-image');
+    img.src = `http://localhost:5000/uploads/${roomImages[currentImageIndex]}`;
+    document.getElementById('current-img').textContent = currentImageIndex + 1;
+    lightbox.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // Prevent scrolling
+    
+    // Reset zoom and position
+    resetZoom();
+  }
+
+  function closeLightbox() {
+    document.getElementById('lightbox').style.display = 'none';
+    document.body.style.overflow = 'auto'; // Re-enable scrolling
+    resetZoom();
+  }
+
+  // Zoom Functions
+  function zoomIn() {
+    currentZoom = Math.min(currentZoom * 1.2, 5);
+    updateImageTransform();
+  }
+
+  function zoomOut() {
+    currentZoom = Math.max(currentZoom / 1.2, 1);
+    updateImageTransform();
+  }
+
+  function resetZoom() {
+    currentZoom = 1;
+    imageTranslateX = 0;
+    imageTranslateY = 0;
+    isZoomed = false;
+    updateImageTransform();
+  }
+
+  function updateImageTransform() {
+    const img = document.getElementById('lightbox-image');
+    if (img) {
+      img.style.transform = `scale(${currentZoom}) translate(${imageTranslateX}px, ${imageTranslateY}px)`;
+    }
+    isZoomed = currentZoom > 1;
+  }
+
+  // Mouse zoom handling
+  function handleMouseWheel(e) {
+    const lightbox = document.getElementById('lightbox');
+    if (!lightbox || lightbox.style.display !== 'flex') return;
+    
+    e.preventDefault();
+    if (e.deltaY < 0) {
+      zoomIn();
+    } else {
+      zoomOut();
+    }
+  }
+
+  // Mouse drag handling
+  function handleMouseDown(e) {
+    const lightbox = document.getElementById('lightbox');
+    if (!lightbox || lightbox.style.display !== 'flex' || !isZoomed) return;
+    
+    isDragging = true;
+    startX = e.clientX - imageTranslateX;
+    startY = e.clientY - imageTranslateY;
+    document.body.style.cursor = 'grabbing';
+  }
+
+  function handleMouseMove(e) {
+    if (!isDragging || !isZoomed) return;
+    
+    imageTranslateX = e.clientX - startX;
+    imageTranslateY = e.clientY - startY;
+    updateImageTransform();
+  }
+
+  function handleMouseUp() {
+    isDragging = false;
+    document.body.style.cursor = 'default';
+  }
+
+  // Touch handling for swipe and pinch zoom
+  function handleTouchStart(e) {
+    const lightbox = document.getElementById('lightbox');
+    if (!lightbox || lightbox.style.display !== 'flex') return;
+    
+    if (e.touches.length === 1) {
+      // Single touch - potential swipe or drag
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      isSwipeGesture = false;
+      
+      if (isZoomed) {
+        isDragging = true;
+        startX = e.touches[0].clientX - imageTranslateX;
+        startY = e.touches[0].clientY - imageTranslateY;
+      }
+    } else if (e.touches.length === 2) {
+      // Pinch start
+      e.preventDefault();
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const initialDistance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      e.target.dataset.initialDistance = initialDistance;
+      e.target.dataset.initialZoom = currentZoom;
+    }
+  }
+
+  function handleTouchMove(e) {
+    const lightbox = document.getElementById('lightbox');
+    if (!lightbox || lightbox.style.display !== 'flex') return;
+    
+    if (e.touches.length === 1 && isDragging && isZoomed) {
+      // Drag zoomed image
+      e.preventDefault();
+      imageTranslateX = e.touches[0].clientX - startX;
+      imageTranslateY = e.touches[0].clientY - startY;
+      updateImageTransform();
+    } else if (e.touches.length === 2) {
+      // Pinch zoom
+      e.preventDefault();
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const currentDistance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      const initialDistance = parseFloat(e.target.dataset.initialDistance);
+      const initialZoom = parseFloat(e.target.dataset.initialZoom);
+      
+      currentZoom = initialZoom * (currentDistance / initialDistance);
+      currentZoom = Math.max(1, Math.min(currentZoom, 5));
+      updateImageTransform();
+    } else if (e.touches.length === 1 && !isZoomed) {
+      // Check for swipe
+      const deltaX = e.touches[0].clientX - touchStartX;
+      const deltaY = e.touches[0].clientY - touchStartY;
+      
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+        isSwipeGesture = true;
+      }
+    }
+  }
+
+  function handleTouchEnd(e) {
+    const lightbox = document.getElementById('lightbox');
+    if (!lightbox || lightbox.style.display !== 'flex') return;
+    
+    if (isDragging) {
+      isDragging = false;
+    }
+    
+    if (isSwipeGesture && e.changedTouches.length === 1) {
+      const deltaX = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(deltaX) > 100) {
+        if (deltaX > 0) {
+          prevImage();
+        } else {
+          nextImage();
+        }
+      }
+    }
+    
+    isSwipeGesture = false;
+  }
+
+  function nextImage() {
+    currentImageIndex = (currentImageIndex + 1) % roomImages.length;
+    const img = document.getElementById('lightbox-image');
+    img.src = `http://localhost:5000/uploads/${roomImages[currentImageIndex]}`;
+    document.getElementById('current-img').textContent = currentImageIndex + 1;
+    resetZoom();
+  }
+
+  function prevImage() {
+    currentImageIndex = (currentImageIndex - 1 + roomImages.length) % roomImages.length;
+    const img = document.getElementById('lightbox-image');
+    img.src = `http://localhost:5000/uploads/${roomImages[currentImageIndex]}`;
+    document.getElementById('current-img').textContent = currentImageIndex + 1;
+    resetZoom();
+  }
+
+  // Keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    const lightbox = document.getElementById('lightbox');
+    if (lightbox.style.display === 'flex') {
+      if (e.key === 'ArrowRight') nextImage();
+      if (e.key === 'ArrowLeft') prevImage();
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === '+' || e.key === '=') zoomIn();
+      if (e.key === '-') zoomOut();
+      if (e.key === '0') resetZoom();
+    }
+  });
+
+  async function toggleFavorite(roomId, btn) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Please login to save favorites');
+      return;
+    }
+    const heart = btn.querySelector('.heart-icon');
+    const isFavorited = heart.classList.contains('favorited');
+
+    try {
+      if (isFavorited) {
+        const res = await fetch(`http://localhost:5000/api/favorites/${roomId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          heart.classList.remove('favorited');
+          btn.innerHTML = '<span class="heart-icon">♥</span> Save to Favorites';
+        }
+      } else {
+        const res = await fetch(`http://localhost:5000/api/favorites`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ roomId })
+        });
+        if (res.ok) {
+          heart.classList.add('favorited');
+          btn.innerHTML = '<span class="heart-icon favorited">♥</span> Saved to Favorites';
+        }
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+    }
+  }
+
+  async function checkFavoriteStatus(roomId) {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch(`http://localhost:5000/api/favorites/${roomId}/isFavorite`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      const btn = document.getElementById('favorite-btn');
+      if (btn) {
+        const heart = btn.querySelector('.heart-icon');
+        if (data.isFavorite) {
+          heart.classList.add('favorited');
+          btn.innerHTML = '<span class="heart-icon favorited">♥</span> Saved to Favorites';
+        } else {
+          heart.classList.remove('favorited');
+          btn.innerHTML = '<span class="heart-icon">♥</span> Save to Favorites';
+        }
+      }
+    } catch (err) {
+      console.error('Error checking favorite status:', err);
+    }
+  }
+
+  function setupContactForm() {
+    const contactForm = document.getElementById('contact-form');
+    if (contactForm) {
+      contactForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData);
+
+        const messageDiv = document.getElementById('form-message');
+        messageDiv.textContent = 'Sending...';
+        messageDiv.className = 'form-message';
+
+        try {
+          const res = await fetch('http://localhost:5000/api/contact', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : ''
+            },
+            body: JSON.stringify(data)
+          });
+
+          const result = await res.json();
+          if (res.ok) {
+            messageDiv.textContent = 'Message sent successfully!';
+            messageDiv.className = 'form-message success';
+            e.target.reset();
+          } else {
+            messageDiv.textContent = result.message || 'Failed to send message';
+            messageDiv.className = 'form-message error';
+          }
+        } catch (err) {
+          messageDiv.textContent = 'Error sending message. Please try again.';
+          messageDiv.className = 'form-message error';
+          console.error('Contact form error:', err);
+        }
+      });
+    }
+  }
+
+  // Setup lightbox event listeners
+  function setupLightboxEvents() {
+    if (lightboxEventsSetup) return; // Prevent multiple setups
+    lightboxEventsSetup = true;
+    
+    const lightboxImage = document.getElementById('lightbox-image');
+    if (!lightboxImage) return; // Safety check
+
+    // Mouse events
+    lightboxImage.addEventListener('wheel', handleMouseWheel);
+    lightboxImage.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    // Touch events
+    lightboxImage.addEventListener('touchstart', handleTouchStart, { passive: false });
+    lightboxImage.addEventListener('touchmove', handleTouchMove, { passive: false });
+    lightboxImage.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+    // Prevent context menu on right click
+    lightboxImage.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+  // ──────────────────────────────────────────────────────────
+
+  // Chat Functions
+  let currentChatRoomId = null;
+  let currentChatOwnerName = null;
+  let currentChatRoomTitle = null;
+  let socket = null;
+  let pollInterval = null; // for polling incoming messages
+
+  // Initialize Socket.IO
+  function initSocket() {
+    socket = io('http://localhost:5000');
+    
+    socket.on('connect', () => {
+      console.log('Connected to chat server');
+    });
+
+    socket.on('new-message', (data) => {
+      // Only update if we're viewing this chat
+      if (currentChatRoomId && data.chatId === currentChatRoomId) {
+        // Reload messages to show the new one
+        loadChatMessages();
+      }
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Disconnected from chat server');
+    });
+  }
+
+  function openChat(roomId, roomTitle, ownerName) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Please login to send messages');
+      return;
+    }
+
+    currentChatRoomId = roomId;
+    currentChatRoomTitle = roomTitle;
+    currentChatOwnerName = ownerName;
+
+    document.getElementById('chat-title').textContent = `Chat with ${ownerName}`;
+    document.getElementById('chat-room-title').textContent = roomTitle;
+    document.getElementById('chat-overlay').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+
+    // Join chat room
+    if (socket) {
+      socket.emit('join-chat', roomId);
+    }
+    
+    loadChatMessages();
+    startPolling(); // check for new incoming messages every 5 s
+
+    // Ensure input field is enabled and focus it
+    setTimeout(() => {
+      const messageInput = document.getElementById('message-input');
+      const sendButton = document.getElementById('send-button');
+      if (messageInput) {
+        messageInput.disabled = false;
+        messageInput.focus();
+      }
+      if (sendButton) {
+        sendButton.disabled = false;
+        sendButton.textContent = 'Send';
+      }
+    }, 100);
+  }
+
+  async function loadChatMessages() {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/chat/room/${currentChatRoomId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        displayMessages(data.messages || []);
+      } else {
+        const messagesContainer = document.getElementById('messages-container');
+        messagesContainer.innerHTML = '<div class="no-messages"><p>Failed to load messages</p></div>';
+      }
+    } catch (error) {
+      console.error('Error loading messages:', error);
+      const messagesContainer = document.getElementById('messages-container');
+      messagesContainer.innerHTML = '<div class="no-messages"><p>Error loading messages</p></div>';
+    }
+  }
+
+  function displayMessages(messages) {
+    const messagesContainer = document.getElementById('messages-container');
+
+    if (messages.length === 0) {
+      messagesContainer.innerHTML = '<div class="no-messages"><p>No messages yet. Start the conversation!</p></div>';
+      return;
+    }
+
+    // Get current user ID from token
+    const token = localStorage.getItem('token');
+    let currentUserId = null;
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        currentUserId = payload.id;
+      } catch (error) {
+        console.error('Error parsing token:', error);
+      }
+    }
+
+    const messagesHtml = messages.map(msg => {
+      const isSent = msg.sender === currentUserId;
+      const messageClass = isSent ? 'sent' : 'received';
+      const timeString = new Date(msg.createdAt || msg.timestamp).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      return `
+        <div class="message ${messageClass}">
+          <div class="message-content">${msg.message}</div>
+          <div class="message-time">${timeString}</div>
+        </div>
+      `;
+    }).join('');
+
+    messagesContainer.innerHTML = messagesHtml;
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  // Instantly adds one message bubble to the open chat window.
+  // Call this right after the user hits Send — no waiting for the server.
+  function appendMessage(text, isSent) {
+    const container = document.getElementById('messages-container');
+    if (!container) return;
+
+    // Remove the "no messages yet" placeholder if it's still showing
+    const placeholder = container.querySelector('.no-messages');
+    if (placeholder) placeholder.remove();
+
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const div = document.createElement('div');
+    div.className = `message ${isSent ? 'sent' : 'received'}`;
+    div.innerHTML = `
+      <div class="message-content">${text}</div>
+      <div class="message-time">${time}</div>
+    `;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight; // scroll to the new bubble
+  }
+
+  // Poll the server every 5 seconds while the chat is open so incoming
+  // messages from the other person appear without a page reload.
+  function startPolling() {
+    if (pollInterval) return; // already running
+    pollInterval = setInterval(loadChatMessages, 5000);
+  }
+
+  function stopPolling() {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
+
+  async function sendMessage() {
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    const message = messageInput.value.trim();
+
+    if (!message || !currentChatRoomId) {
+      // Re-enable input if validation fails
+      messageInput.disabled = false;
+      sendButton.disabled = false;
+      return;
+    }
+
+    // Disable input and button
+    messageInput.disabled = true;
+    sendButton.disabled = true;
+    sendButton.textContent = 'Sending...';
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/chat/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          roomId: currentChatRoomId,
+          message: message
+        })
+      });
+
+      if (response.ok) {
+        appendMessage(message, true); // show the bubble instantly
+        messageInput.value = '';
+      } else {
+        alert('Failed to send message');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      alert('Error sending message');
+    } finally {
+      // Always re-enable input and button
+      messageInput.disabled = false;
+      sendButton.disabled = false;
+      sendButton.textContent = 'Send';
+      messageInput.focus();
+    }
+  }
+
+  function closeChat() {
+    document.getElementById('chat-overlay').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    stopPolling(); // stop the 5-second fetch loop
+
+    // Leave chat room
+    if (socket && currentChatRoomId) {
+      socket.emit('leave-chat', currentChatRoomId);
+    }
+
+    currentChatRoomId = null;
+  }
+
+  // ── ADDED: Get current user ID from token ───────────────────
+  async function getCurrentUserId() {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.id;
+    } catch {
+      return null;
+    }
+  }
+
+  function editRoom(roomId) {
+    location.href = `post-room.html?id=${roomId}`;
+  }
+
+  async function toggleRoomStatus(roomId) {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`http://localhost:5000/api/rooms/${roomId}/status`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const btn = document.getElementById('toggle-status-btn');
+        const badge = document.querySelector('.status-badge');
+        if (data.status === 'occupied') {
+          btn.textContent = '✅ Mark as Available';
+          btn.className = 'btn-toggle-status status-mark-available';
+          badge.textContent = 'Occupied';
+          badge.className = 'status-badge status-occupied';
+        } else {
+          btn.textContent = '🔴 Mark as Occupied';
+          btn.className = 'btn-toggle-status status-mark-occupied';
+          badge.textContent = 'Available';
+          badge.className = 'status-badge status-available';
+        }
+      } else {
+        alert(data.message || 'Failed to update status');
+      }
+    } catch (err) {
+      console.error('Error toggling status:', err);
+    }
+  }
+
+  // ── ADDED: Delete room with confirmation ────────────────────
+  async function deleteRoom(roomId) {
+    if (!confirm('Are you sure you want to delete this room? This action cannot be undone.')) return;
+
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`http://localhost:5000/api/rooms/${roomId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Room deleted successfully');
+        location.href = 'index.html';
+      } else {
+        alert(data.message || 'Failed to delete room');
+      }
+    } catch (err) {
+      console.error('Error deleting room:', err);
+      alert('Error deleting room');
+    }
+  }
+
+  // Handle enter key in message input
+  document.addEventListener('DOMContentLoaded', () => {
+    const messageInput = document.getElementById('message-input');
+    if (messageInput) {
+      messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+    }
+    
+    // Initialize Socket.IO
+    initSocket();
+  });
 
   loadRoom();
 </script>

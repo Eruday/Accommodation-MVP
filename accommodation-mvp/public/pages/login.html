@@ -9,7 +9,10 @@
 <body>
 
 <nav>
-  <a class="brand" href="index.html">GermanyRooms</a>
+  <a href="index.html" class="logo">
+    <div class="logo-icon">IX</div>
+    <div class="logo-text">ISHAANX</div>
+  </a>
   <div><a href="register.html">Register</a></div>
 </nav>
 
@@ -38,6 +41,7 @@
     if (res.ok) {
       localStorage.setItem('token',    data.token);
       localStorage.setItem('userName', data.name);
+      localStorage.setItem('userId',   data.userId); // needed for thread grouping in inbox
       location.href = 'index.html';
     } else {
       msg.textContent = data.message;

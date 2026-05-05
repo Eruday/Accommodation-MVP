@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Inbox - GermanyRooms</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+
+<nav>
+  <a href="../pages/index.html" class="logo">
+    <div class="logo-icon">IX</div>
+    <div class="logo-text">ISHAANX</div>
+  </a>
+  <div>
+    <a href="index.html">Browse</a>
+    <a href="#" onclick="logout()">Logout</a>
+  </div>
+</nav>
+
+<div class="container">
+  <h2>📬 Inbox</h2>
+  <p style="color:#888;margin-bottom:1.5rem;font-size:0.9rem">Messages sent to you by people interested in your rooms.</p>
+  <div id="inbox-list"><p>Loading...</p></div>
+</div>
+
+<script>
+  const token = localStorage.getItem('token');
+  if (!token) location.href = 'login.html';
+
+  function getCurrentUserId() {
+    const stored = localStorage.getItem('userId');
+    if (stored) return stored;
+    try {
+      return JSON.parse(atob(token.split('.')[1])).id;
+    } catch { return null; }
+  }
+  const currentUserId = getCurrentUserId();
+
+  function logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userId');
+    location.href = 'index.html';
+  }
+
+  // IDs of messages already in the DOM — used to skip re-renders
+  const knownIds = new Set();
+  let firstLoadDone = false;
+
+  // Turn a thread key into a safe DOM id
+  function safeId(key) {
+    return 'thread-' + key.replace(/[^a-z0-9]/gi, '_');
+  }
+
+  // Stable key that identifies a conversation thread
+  function threadKey(thread) {
+    return thread.roomId + '_' + (thread.otherPersonId || thread.otherPersonEmail || 'anon');
+  }
+
+  // Build one message bubble
+  function makeBubble(msg, isSentByMe, otherPersonName) {
+    const time = new Date(msg.createdAt).toLocaleString('en-GB', {
+      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+    });
+    const label = isSentByMe ? 'You' : otherPersonName;
+    return `
+      <div class="message ${isSentByMe ? 'sent' : 'received'}">
+        <div class="message-content">${msg.message}</div>
+        <div class="message-time">${label} · ${time}</div>
+      </div>`;
+  }
+
+  // Build full HTML for one thread (used on first render and for brand-new threads)
+  function renderThread(thread) {
+    const key   = threadKey(thread);
+    const domId = safeId(key);
+
+    const bubblesHtml = thread.messages.map(msg =>
+      makeBubble(msg, msg.isSentByMe, thread.otherPersonName)
+    ).join('');
+
+    const replyHtml = thread.otherPersonId ? `
+      <div class="inbox-thread-reply">
+        <textarea id="reply-text-${domId}" rows="2" placeholder="Write a reply..."></textarea>
+        <button onclick="sendReply('${thread.otherPersonId}', '${thread.roomId}', '${domId}')">Send</button>
+      </div>` : '';
+
+    const locationPart = thread.roomLocation ? ' — ' + thread.roomLocation : '';
+    const emailPart    = thread.otherPersonEmail ? ' · ' + thread.otherPersonEmail : '';
+    const count        = thread.messages.length;
+
+    return `
+      <div class="inbox-thread" id="${domId}">
+        <div class="inbox-thread-header">
+          <div class="inbox-card-room">📌 ${thread.roomTitle}${locationPart}</div>
+          <div class="inbox-card-from">
+            With: <strong>${thread.otherPersonName}</strong>${emailPart}
+            &nbsp;<span class="msg-count" style="color:#999;font-size:0.8rem">${count} message${count !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+        <div class="inbox-thread-messages">${bubblesHtml}</div>
+        ${replyHtml}
+        <div class="inbox-thread-status" id="reply-status-${domId}"></div>
+      </div>`;
+  }
+
+  // Group a flat message list into conversation threads (unchanged logic)
+  function groupIntoThreads(messages) {
+    const threads = {};
+
+    messages.forEach(msg => {
+      const roomId     = msg.roomId?._id  || '';
+      const senderId   = msg.sender?._id  || '';
+      const receiverId = msg.receiver?._id || '';
+      const isSentByMe = senderId === currentUserId;
+
+      const otherPersonId    = isSentByMe ? receiverId : senderId;
+      const otherPersonName  = isSentByMe
+        ? (msg.receiver?.name  || 'Owner')
+        : (msg.sender?.name    || msg.senderName || 'Unknown');
+      const otherPersonEmail = isSentByMe
+        ? (msg.receiver?.email || '')
+        : (msg.sender?.email   || msg.senderEmail || '');
+
+      const key = roomId + '_' + (otherPersonId || msg.senderEmail || 'anon');
+
+      if (!threads[key]) {
+        threads[key] = { roomId, roomTitle: msg.roomId?.title || 'Unknown Room',
+          roomLocation: msg.roomId?.location || '', otherPersonId, otherPersonName,
+          otherPersonEmail, messages: [] };
+      }
+
+      threads[key].messages.push({ ...msg, isSentByMe });
+    });
+
+    return Object.values(threads);
+  }
+
+  async function loadInbox() {
+    const container  = document.getElementById('inbox-list');
+    const isInitial  = !firstLoadDone;
+
+    try {
+      const res = await fetch('http://localhost:5000/api/messages', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        if (isInitial) container.innerHTML = '<p style="color:red">Failed to load messages.</p>';
+        return;
+      }
+
+      const messages = await res.json();
+
+      // Only process messages not already in the DOM
+      const newMessages = messages.filter(m => !knownIds.has(m._id));
+
+      // Nothing new — skip all DOM work (no flicker, no scroll jump)
+      if (!isInitial && newMessages.length === 0) return;
+
+      firstLoadDone = true;
+      newMessages.forEach(m => knownIds.add(m._id));
+
+      if (messages.length === 0) {
+        if (isInitial) container.innerHTML = '<p class="inbox-empty">No messages yet. When someone contacts you about a room, it will appear here.</p>';
+        return;
+      }
+
+      const threads = groupIntoThreads(messages);
+
+      if (isInitial) {
+        // First load: full render, then scroll to bottom
+        container.innerHTML = threads.map(t => renderThread(t)).join('');
+        window.scrollTo(0, document.body.scrollHeight);
+        return;
+      }
+
+      // Incremental update: append only new bubbles without touching existing DOM
+      const atBottom = (window.innerHeight + window.scrollY) >= document.body.scrollHeight - 150;
+
+      // Build a quick-lookup map: key → thread (for name/count)
+      const threadMap = {};
+      threads.forEach(t => { threadMap[threadKey(t)] = t; });
+
+      // Group new messages by their thread key
+      const msgsByThread = {};
+      newMessages.forEach(msg => {
+        const roomId     = msg.roomId?._id || '';
+        const senderId   = msg.sender?._id || '';
+        const receiverId = msg.receiver?._id || '';
+        const isSentByMe = senderId === currentUserId;
+        const otherId    = isSentByMe ? receiverId : senderId;
+        const key        = roomId + '_' + (otherId || msg.senderEmail || 'anon');
+        (msgsByThread[key] = msgsByThread[key] || []).push({ ...msg, isSentByMe });
+      });
+
+      Object.entries(msgsByThread).forEach(([key, msgs]) => {
+        const domId  = safeId(key);
+        const thread = threadMap[key];
+        const el     = document.getElementById(domId);
+
+        if (el) {
+          // Existing thread: append bubbles only
+          const bubblesEl = el.querySelector('.inbox-thread-messages');
+          msgs.forEach(msg => {
+            bubblesEl.insertAdjacentHTML('beforeend',
+              makeBubble(msg, msg.isSentByMe, thread?.otherPersonName || ''));
+          });
+          // Update the message count badge
+          const countEl = el.querySelector('.msg-count');
+          if (countEl && thread) {
+            const c = thread.messages.length;
+            countEl.textContent = `${c} message${c !== 1 ? 's' : ''}`;
+          }
+        } else if (thread) {
+          // Brand-new thread: append the whole card
+          container.insertAdjacentHTML('beforeend', renderThread(thread));
+        }
+      });
+
+      // Only scroll if user was already at the bottom
+      if (atBottom) window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+
+    } catch (err) {
+      if (isInitial) container.innerHTML = '<p style="color:red">Error loading inbox. Make sure you are logged in.</p>';
+    }
+  }
+
+  async function sendReply(receiverId, roomId, threadId) {
+    const textarea = document.getElementById('reply-text-' + threadId);
+    const status   = document.getElementById('reply-status-' + threadId);
+    const text     = textarea.value.trim();
+
+    if (!text) { status.textContent = 'Please write a message.'; status.style.color = 'red'; return; }
+
+    status.textContent = 'Sending...';
+    status.style.color = '#888';
+
+    try {
+      const res = await fetch('http://localhost:5000/api/messages/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ receiverId, roomId, message: text })
+      });
+
+      if (res.ok) {
+        status.textContent = 'Sent!';
+        status.style.color = 'green';
+        textarea.value = '';
+        setTimeout(() => loadInbox(), 1000);
+      } else {
+        status.textContent = 'Failed to send.';
+        status.style.color = 'red';
+      }
+    } catch {
+      status.textContent = 'Error. Try again.';
+      status.style.color = 'red';
+    }
+  }
+
+  loadInbox();
+
+  setInterval(() => {
+    const isTyping = [...document.querySelectorAll('.inbox-thread-reply textarea')]
+      .some(ta => ta.value.trim() !== '');
+    if (!isTyping) loadInbox();
+  }, 5000);
+</script>
+</body>
+</html>

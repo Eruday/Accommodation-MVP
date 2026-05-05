@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Favorites - GermanyRooms</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="logo">
+    <div class="logo-icon">IX</div>
+    <div class="logo-text">ISHAANX</div>
+  </a>
+  <div id="nav-links">
+    <a href="index.html">View All Rooms</a>
+  </div>
+</nav>
+
+<div class="container">
+  <h1>My Favorite Rooms</h1>
+
+  <div class="rooms-grid" id="favorites-grid">
+    <p>Loading your favorites...</p>
+  </div>
+</div>
+
+<script>
+  const API = 'http://localhost:5000/api';
+
+  function updateNav() {
+    const name = localStorage.getItem('userName');
+    const nav = document.getElementById('nav-links');
+    if (name) {
+      nav.innerHTML = `
+        <span style="color:#f39c12">Hi, ${name}</span>
+        <a href="post-room.html">List Your Room</a>
+        <a href="#" onclick="logout()">Logout</a>`;
+    } else {
+      location.href = 'login.html'; // Redirect if not logged in
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userName');
+    location.href = 'index.html';
+  }
+
+  async function loadFavorites() {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      location.href = 'login.html';
+      return;
+    }
+    try {
+      const res = await fetch(`${API}/favorites`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const rooms = await res.json();
+      renderRooms(rooms);
+    } catch (err) {
+      console.error('Error loading favorites:', err);
+      document.getElementById('favorites-grid').innerHTML = '<p>Error loading favorites.</p>';
+    }
+  }
+
+  function renderRooms(rooms) {
+    const grid = document.getElementById('favorites-grid');
+    if (!rooms.length) {
+      grid.innerHTML = '<p>You have no favorite rooms yet. Start exploring and save some!</p>';
+      return;
+    }
+    grid.innerHTML = rooms.map(r => `
+      <div class="room-card">
+        <img src="${r.images && r.images.length > 0 ? 'http://localhost:5000/uploads/' + r.images[0] : 'https://placehold.co/400x200?text=No+Image'}" alt="room" onclick="location.href='room.html?id=${r._id}'"/>
+        <button class="favorite-btn favorited" onclick="toggleFavorite('${r._id}', this)">
+          <span class="heart-icon favorited">♥</span>
+        </button>
+        <div class="info" onclick="location.href='room.html?id=${r._id}'">
+          <h3>${r.title}</h3>
+          <div class="price">€${r.price}/month</div>
+          <div class="location">${r.location}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  async function toggleFavorite(roomId, btn) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Please login to save favorites');
+      return;
+    }
+    const heart = btn.querySelector('.heart-icon');
+    const isFavorited = heart.classList.contains('favorited');
+
+    try {
+      if (isFavorited) {
+        const res = await fetch(`${API}/favorites/${roomId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          // Remove from favorites page
+          btn.closest('.room-card').remove();
+          const grid = document.getElementById('favorites-grid');
+          if (grid.children.length === 0) {
+            grid.innerHTML = '<p>You have no favorite rooms yet. Start exploring and save some!</p>';
+          }
+        }
+      } else {
+        const res = await fetch(`${API}/favorites`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ roomId })
+        });
+        if (res.ok) {
+          heart.classList.add('favorited');
+        }
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+    }
+  }
+
+  updateNav();
+  loadFavorites();
+</script>
+</body>
+</html>

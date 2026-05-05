@@ -9,7 +9,10 @@
 <body>
 
 <nav>
-  <a class="brand" href="index.html">GermanyRooms</a>
+  <a href="index.html" class="logo">
+    <div class="logo-icon">IX</div>
+    <div class="logo-text">ISHAANX</div>
+  </a>
   <div>
     <a href="index.html">Browse</a>
     <a href="#" onclick="logout()">Logout</a>
@@ -17,14 +20,61 @@
 </nav>
 
 <div class="form-card">
-  <h2>Post a Room</h2>
+  <h2 id="form-title">List Your Room for Rent</h2>
   <form id="room-form" enctype="multipart/form-data">
-    <input type="text"   name="title"        placeholder="Room Title (e.g. Cozy room in Munich)" required />
+    <input type="text"   name="title"        placeholder="e.g. Private furnished room near Berlin center" required />
     <input type="number" name="price"        placeholder="Monthly Rent (€)" required />
-    <input type="text"   name="location"     placeholder="City (e.g. Berlin, Hamburg)" required />
-    <input type="email"  name="contactEmail" placeholder="Contact Email" required />
-    <input type="text"   name="contactPhone" placeholder="Contact Phone" required />
+    <div style="max-width:500px;">
+  
+  <!-- City Dropdown -->
+  <select name="location" id="citySelect" required>
+    <option value="" disabled selected>Select City</option>
 
+    <option value="Berlin">Berlin</option>
+    <option value="Munich">Munich</option>
+    <option value="Hamburg">Hamburg</option>
+    <option value="Cologne">Cologne</option>
+    <option value="Frankfurt">Frankfurt</option>
+    <option value="Stuttgart">Stuttgart</option>
+    <option value="Düsseldorf">Düsseldorf</option>
+    <option value="Dortmund">Dortmund</option>
+    <option value="Leipzig">Leipzig</option>
+    <option value="Bremen">Bremen</option>
+    <option value="Hannover">Hannover</option>
+    <option value="Dresden">Dresden</option>
+    <option value="Nuremberg">Nuremberg</option>
+    <option value="Essen">Essen</option>
+    <option value="Bonn">Bonn</option>
+    <option value="Münster">Münster</option>
+    <option value="Freiburg">Freiburg</option>
+    <option value="Kiel">Kiel</option>
+    <option value="Mainz">Mainz</option>
+    <option value="Potsdam">Potsdam</option>
+
+    <!-- Important -->
+    <option value="other">Other City</option>
+  </select>
+  <!-- Other City Input -->
+  <input 
+    type="text" 
+    id="otherCity" 
+    name="otherCity" 
+    placeholder="Enter your city (e.g. Chemnitz)" 
+    style="display:none; margin-top:10px; width:100%; padding:8px;"
+  />
+
+</div>
+
+    <input type="text"   name="address"      placeholder="Full Address (e.g. Musterstrasse 123, Berlin 10115)" />
+    <input type="email"  name="contactEmail" placeholder="Contact Email" required />
+    <!-- <input type="text"   name="contactPhone" placeholder="Contact Phone" required /> -->
+<input 
+  type="tel" 
+  name="contactPhone" 
+  placeholder="Contact Phone (e.g. +491234567890)" 
+  pattern="^\+?[0-9\s\-]{7,15}$"
+  required 
+/>
     <!-- ── NEW FIELDS ─────────────────────────────────────── -->
     <input type="number" name="securityDeposit" placeholder="Security Deposit (€) — leave 0 if none" min="0" />
 
@@ -36,6 +86,11 @@
       <option value="apartment">Apartment</option>
     </select>
 
+    <select name="status">
+      <option value="available">Available</option>
+      <option value="occupied">Occupied</option>
+    </select>
+
     <select name="furnishing" required>
       <option value="" disabled selected>Furnishing</option>
       <option value="furnished">Fully Furnished</option>
@@ -43,16 +98,52 @@
       <option value="unfurnished">Unfurnished</option>
     </select>
 
+    <label style="font-size:0.85rem;color:#555;margin-bottom:0.5rem;display:block"><strong>Anmeldung Possible *</strong></label>
+    <div class="radio-group">
+      <label class="radio-option">
+        <input type="radio" name="anmeldung" value="true" required /> Yes
+      </label>
+      <label class="radio-option">
+        <input type="radio" name="anmeldung" value="false" required /> No
+      </label>
+    </div>
+
     <label style="font-size:0.85rem;color:#555;margin-bottom:0.25rem;display:block">Available From *</label>
     <input type="date" name="availableFrom" required />
 
     <input type="number" name="minStay" placeholder="Minimum Stay (months) — optional" min="1" />
 
+    <!-- ── AMENITIES ─────────────────────────────────────── -->
+    <label style="font-size:0.85rem;color:#555;margin-bottom:0.5rem;display:block"><strong>Amenities</strong></label>
+    <div class="amenities-check-grid">
+      <label class="amenity-option">
+        <input type="checkbox" name="amenities" value="WiFi" /> WiFi
+      </label>
+      <label class="amenity-option">
+        <input type="checkbox" name="amenities" value="Kitchen" /> Kitchen
+      </label>
+      <label class="amenity-option">
+        <input type="checkbox" name="amenities" value="Parking" /> Parking
+      </label>
+      <label class="amenity-option">
+        <input type="checkbox" name="amenities" value="Washer" /> Washer
+      </label>
+      <label class="amenity-option">
+        <input type="checkbox" name="amenities" value="Heating" /> Heating
+      </label>
+      <label class="amenity-option">
+        <input type="checkbox" name="amenities" value="AC" /> Air Conditioning
+      </label>
+    </div>
+
     <textarea name="additionalNotes" rows="3" placeholder="Additional Notes (pets allowed, no smoking, etc.)"></textarea>
     <!-- ──────────────────────────────────────────────────── -->
 
-    <input type="file"   name="image" accept="image/*"  required />
-    <button type="submit">Post Room</button>
+    <label style="font-size:0.85rem;color:#555;margin-bottom:0.25rem;display:block">Photos (up to 3) *</label>
+    <input type="file" id="images-input" name="images" accept="image/*" multiple required onchange="previewImages()" />
+    <div id="preview-container" style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap"></div>
+
+    <button type="submit">List Your Room</button>
   </form>
   <p class="msg" id="msg"></p>
 </div>
@@ -61,24 +152,151 @@
   const token = localStorage.getItem('token');
   if (!token) location.href = 'login.html';
 
+  // ── ADDED: Get room ID from URL if editing ──────────────────
+  const urlParams = new URLSearchParams(window.location.search);
+  const roomId = urlParams.get('id');
+  let isEditMode = false;
+
   function logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('userName');
     location.href = 'index.html';
   }
 
+  // ── ADDED: Load room data if editing ────────────────────────
+  async function loadRoomForEdit() {
+    if (!roomId) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/rooms/${roomId}`);
+      if (!res.ok) {
+        alert('Room not found');
+        location.href = 'index.html';
+        return;
+      }
+
+      const room = await res.json();
+      isEditMode = true;
+      document.getElementById('form-title').textContent = 'Edit Room';
+
+      // Pre-fill form fields
+      document.querySelector('input[name="title"]').value = room.title || '';
+      document.querySelector('input[name="price"]').value = room.price || '';
+      const citySelectEl = document.getElementById('citySelect');
+      const otherCityEl = document.getElementById('otherCity');
+      if ([...citySelectEl.options].some(opt => opt.value === room.location)) {
+        citySelectEl.value = room.location;
+      } else {
+        citySelectEl.value = 'other';
+        otherCityEl.style.display = 'block';
+        otherCityEl.value = room.location || '';
+      }
+      document.querySelector('input[name="address"]').value = room.address || '';
+      document.querySelector('input[name="contactEmail"]').value = room.contact?.email || '';
+      document.querySelector('input[name="contactPhone"]').value = room.contact?.phone || '';
+      document.querySelector('input[name="securityDeposit"]').value = room.securityDeposit || '';
+      document.querySelector('select[name="status"]').value = room.status || 'available';
+      document.querySelector('select[name="roomType"]').value = room.roomType || '';
+      document.querySelector('select[name="furnishing"]').value = room.furnishing || '';
+      document.querySelector('input[name="availableFrom"]').value = room.availableFrom?.split('T')[0] || '';
+      document.querySelector('input[name="minStay"]').value = room.minStay || '';
+      document.querySelector('textarea[name="additionalNotes"]').value = room.additionalNotes || '';
+      // Pre-fill anmeldung
+      if (room.anmeldung !== undefined && room.anmeldung !== null) {
+        const anmeldungValue = room.anmeldung === true || room.anmeldung === 'true' ? 'true' : 'false';
+        const anmeldungRadio = document.querySelector(`input[name="anmeldung"][value="${anmeldungValue}"]`);
+        if (anmeldungRadio) anmeldungRadio.checked = true;
+      }
+      // Check amenities
+      const amenitiesCheckboxes = document.querySelectorAll('input[name="amenities"]');
+      let amenities = room.amenities;
+      if (typeof amenities === 'string') {
+        try { amenities = JSON.parse(amenities); } catch { amenities = []; }
+      }
+      if (!Array.isArray(amenities)) amenities = [];
+      amenitiesCheckboxes.forEach(cb => {
+        cb.checked = amenities.includes(cb.value);
+      });
+
+      // Change file input to not required for edit mode
+      document.getElementById('images-input').required = false;
+      // Update label if it exists
+      const photoLabel = Array.from(document.querySelectorAll('label')).find(l => l.textContent.includes('up to 3'));
+      if (photoLabel) {
+        photoLabel.textContent = 'Photos (up to 3 - optional for edit)';
+      }
+    } catch (err) {
+      console.error('Error loading room:', err);
+      alert('Error loading room data');
+    }
+  }
+
+  // Load room data on page load if editing
+  window.addEventListener('DOMContentLoaded', loadRoomForEdit);
+
+  function previewImages() {
+    const input = document.getElementById('images-input');
+    const container = document.getElementById('preview-container');
+    container.innerHTML = '';
+
+    if (input.files.length > 3) {
+      alert('Maximum 3 images allowed');
+      input.value = '';
+      return;
+    }
+
+    for (let file of input.files) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.style.width = '80px';
+        img.style.height = '80px';
+        img.style.objectFit = 'cover';
+        img.style.borderRadius = '4px';
+        container.appendChild(img);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  document.getElementById("citySelect").addEventListener("change", function () {
+    document.getElementById("otherCity").style.display = this.value === "other" ? "block" : "none";
+  });
+
   document.getElementById('room-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    const res = await fetch('http://localhost:5000/api/rooms', {
-      method: 'POST',
+
+    // Resolve "Other City" before sending
+    const citySelect = document.getElementById("citySelect");
+    const otherCityInput = document.getElementById("otherCity");
+    if (citySelect.value === "other") {
+      const city = otherCityInput.value.trim();
+      if (!city) {
+        alert("Please enter your city");
+        return;
+      }
+      formData.set("location", city);
+    }
+
+    // Handle amenities (checkboxes return array)
+    const amenitiesArray = formData.getAll('amenities');
+    formData.delete('amenities');
+    formData.append('amenities', JSON.stringify(amenitiesArray));
+
+    const method = isEditMode ? 'PUT' : 'POST';
+    const url = isEditMode ? `http://localhost:5000/api/rooms/${roomId}` : 'http://localhost:5000/api/rooms';
+
+    const res = await fetch(url, {
+      method: method,
       headers: { Authorization: `Bearer ${token}` },
       body: formData
     });
     const data = await res.json();
     const msg  = document.getElementById('msg');
     if (res.ok) {
-      msg.textContent = 'Room posted! Redirecting...';
+      msg.textContent = isEditMode ? 'Room updated! Redirecting...' : 'Room posted! Redirecting...';
       msg.className = 'msg success';
       setTimeout(() => location.href = 'index.html', 1500);
     } else {
