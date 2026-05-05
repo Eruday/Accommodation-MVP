@@ -29,7 +29,19 @@ chatController.setIo(io);
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
-app.use(express.static('public'));
+const path = require("path");
+
+app.use(cors());
+app.use(express.json());
+
+// serve static files
+app.use(express.static(path.join(__dirname, "public")));
+app.use('/uploads', express.static('uploads'));
+
+// default route
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/pages/index.html"));
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
