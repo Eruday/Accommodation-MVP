@@ -29,7 +29,7 @@ chatController.setIo(io);
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
-app.use('/public', express.static('public'));
+app.use(express.static('public'));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
