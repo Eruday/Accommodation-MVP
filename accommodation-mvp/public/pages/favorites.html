@@ -27,7 +27,7 @@
 </div>
 
 <script>
-  const API = 'http://localhost:5000/api';
+  const API = 'https://accommodation-mvp.onrender.com/api';
 
   function updateNav() {
     const name = localStorage.getItem('userName');
@@ -74,7 +74,7 @@
     }
     grid.innerHTML = rooms.map(r => `
       <div class="room-card">
-        <img src="${r.images && r.images.length > 0 ? 'http://localhost:5000/uploads/' + r.images[0] : 'https://placehold.co/400x200?text=No+Image'}" alt="room" onclick="location.href='room.html?id=${r._id}'"/>
+        <img src="${r.images && r.images.length > 0 ? 'https://accommodation-mvp.onrender.com/uploads/' + r.images[0] : 'https://placehold.co/400x200?text=No+Image'}" alt="room" onclick="location.href='room.html?id=${r._id}'"/>
         <button class="favorite-btn favorited" onclick="toggleFavorite('${r._id}', this)">
           <span class="heart-icon favorited">♥</span>
         </button>
