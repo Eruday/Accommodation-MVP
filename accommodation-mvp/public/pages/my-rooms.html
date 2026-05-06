@@ -155,11 +155,11 @@
     if (name) {
       nav.innerHTML = `
         <span class="welcome">Welcome, ${name}</span>
-        <a href="index.html">Browse Rooms</a>
-        <a href="my-rooms.html" style="color:#f39c12;font-weight:600">My Rooms</a>
+        <a href="/pages/index.html">Browse Rooms</a>
+        <a href="/pages/my-rooms.html" style="color:#f39c12;font-weight:600">My Rooms</a>
         <a href="/pages/favorites.html">Favorites</a>
-        <a href="post-room.html">Post Room</a>
-        <a href="inbox.html">Inbox</a>
+        <a href="/pages/post-room.html">Post Room</a>
+        <a href="/pages/inbox.html">Inbox</a>
         <a href="#" onclick="logout()">Logout</a>`;
     }
   }
@@ -167,7 +167,7 @@
   function logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('userName');
-    location.href = 'login.html';
+    location.href = '/pages/login.html';
   }
 
   async function loadMyRooms() {
@@ -225,9 +225,9 @@
       const isOccupied = r.status === 'occupied';
       return `
         <div class="room-card-owner" id="card-${r._id}">
-          <img src="${img}" alt="room" onclick="location.href='room.html?id=${r._id}'" />
+          <img src="${img}" alt="room" onclick="location.href='/pages/room.html?id=${r._id}'" />
           <div class="card-body">
-            <h3 onclick="location.href='room.html?id=${r._id}'">${r.title}</h3>
+            <h3 onclick="location.href='/pages/room.html?id=${r._id}'">${r.title}</h3>
             <div class="price">€${r.price}/month</div>
             <div class="location">📍 ${r.location}</div>
             <div class="status-row">
@@ -248,7 +248,7 @@
   }
 
   function editRoom(roomId) {
-    location.href = `post-room.html?id=${roomId}`;
+    location.href = `/pages/post-room.html?id=${roomId}`;
   }
 
   async function toggleStatus(roomId, btn) {
@@ -304,7 +304,7 @@
         const remaining = document.querySelectorAll('[id^="card-"]').length;
         if (!remaining) {
           document.getElementById('rooms-grid').innerHTML =
-            '<p class="empty-state">You haven\'t posted any rooms yet. <a href="post-room.html">Post your first room →</a></p>';
+            '<p class="empty-state">You haven\'t posted any rooms yet. <a href="/pages/post-room.html">Post your first room →</a></p>';
         }
         renderStats(collectCurrentRoomData());
       } else {
