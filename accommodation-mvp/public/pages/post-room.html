@@ -168,7 +168,7 @@
     if (!roomId) return;
 
     try {
-      const res = await fetch(`http://localhost:5000/api/rooms/${roomId}`);
+      const res = await fetch(`https://accommodation-mvp.onrender.com/api/rooms/${roomId}`);
       if (!res.ok) {
         alert('Room not found');
         location.href = 'index.html';
@@ -286,7 +286,7 @@
     formData.append('amenities', JSON.stringify(amenitiesArray));
 
     const method = isEditMode ? 'PUT' : 'POST';
-    const url = isEditMode ? `http://localhost:5000/api/rooms/${roomId}` : 'http://localhost:5000/api/rooms';
+    const url = isEditMode ? `https://accommodation-mvp.onrender.com/api/rooms/${roomId}` : 'https://accommodation-mvp.onrender.com/api/rooms';
 
     const res = await fetch(url, {
       method: method,
