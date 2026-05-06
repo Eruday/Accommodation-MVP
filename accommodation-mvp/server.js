@@ -31,9 +31,6 @@ app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 const path = require("path");
 
-app.use(cors());
-app.use(express.json());
-
 // serve static files
 app.use(express.static(path.join(__dirname, "public")));
 app.use('/uploads', express.static('uploads'));
@@ -41,6 +38,21 @@ app.use('/uploads', express.static('uploads'));
 // default route
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public/pages/index.html"));
+});
+app.get("/login.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/pages/login.html"));
+});
+
+app.get("/register.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/pages/register.html"));
+});
+
+app.get("/my-rooms.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/pages/my-rooms.html"));
+});
+
+app.get("/post-room.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/pages/post-room.html"));
 });
 
 app.use('/api/auth', authRoutes);
