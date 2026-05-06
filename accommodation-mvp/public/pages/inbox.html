@@ -143,7 +143,7 @@
     const isInitial  = !firstLoadDone;
 
     try {
-      const res = await fetch('http://localhost:5000/api/messages', {
+      const res = await fetch('https://accommodation-mvp.onrender.com/api/messages', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -239,7 +239,7 @@
     status.style.color = '#888';
 
     try {
-      const res = await fetch('http://localhost:5000/api/messages/reply', {
+      const res = await fetch('https://accommodation-mvp.onrender.com/api/messages/reply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ receiverId, roomId, message: text })
